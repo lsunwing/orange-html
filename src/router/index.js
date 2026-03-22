@@ -39,16 +39,26 @@ const routes = [
           {
             path: 'manual',
             name: 'TaskManual',
-            component: () => import('@/views/task/index.vue'),
+            component: () => import('@/views/task/manual/index.vue'),
             meta: { title: '手动任务', taskType: 'manual' }
           },
           {
             path: 'periodic',
             name: 'TaskPeriodic',
-            component: () => import('@/views/task/index.vue'),
+            component: () => import('@/views/task/periodic/index.vue'),
             meta: { title: '周期任务', taskType: 'periodic' }
+          },
+          {
+            path: 'data',
+            name: 'DataManage',
+            component: () => import('@/views/task/data/index.vue'),
+            meta: { title: '数据管理' }
           }
         ]
+      },
+      {
+        path: 'data',
+        redirect: '/task/data'
       },
       {
         path: 'system/user',

@@ -21,10 +21,13 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item label="任务数据源">
-          <el-select v-model="queryForm.dataSource" placeholder="请选择数据源" clearable style="width: 180px">
+        <el-form-item
+          v-if="fixedTaskType === 'periodic' || queryForm.taskType === 'periodic'"
+          label="任务类型"
+        >
+          <el-select v-model="queryForm.periodicTaskType" placeholder="请选择任务类型" clearable style="width: 180px">
             <el-option
-              v-for="item in dataSourceOptions"
+              v-for="item in periodicTaskTypeOptions"
               :key="item.value"
               :label="item.label"
               :value="item.value"
@@ -57,9 +60,14 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="周期任务类型" min-width="140">
+          <template #default="{ row }">
+            {{ row.taskType === 'periodic' ? periodicTaskTypeText(row.periodicTaskType) : '-' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="taskCode" label="任务编码" min-width="180" show-overflow-tooltip />
-        <el-table-column label="任务数据源" min-width="130">
-          <template #default="{ row }">{{ dataSourceText(row.dataSource) }}</template>
+        <el-table-column label="关联数据" min-width="220">
+          <template #default="{ row }">{{ row.taskType === 'periodic' ? dataNameText(row.dataId) : '-' }}</template>
         </el-table-column>
         <el-table-column label="周期执行配置" min-width="240">
           <template #default="{ row }">{{ row.taskType === 'periodic' ? periodicScheduleText(row) : '-' }}</template>
@@ -95,7 +103,7 @@
       </el-table>
     </el-card>
 
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '修改任务' : '创建任务'" width="560px" @closed="handleDialogClosed">
+    <el-dialog v-model="dialogVisible" :title="isEdit ? '修改任务' : '创建任务'" width="980px" @closed="handleDialogClosed">
       <el-form ref="dialogFormRef" :model="dialogForm" :rules="dialogRules" label-width="110px">
         <el-form-item label="任务名称" prop="taskName">
           <el-input v-model="dialogForm.taskName" placeholder="请输入任务名称" />
@@ -116,13 +124,29 @@
           <el-input v-model="dialogForm.taskCode" placeholder="请输入任务编码" />
         </el-form-item>
 
-        <el-form-item label="任务数据源" prop="dataSource">
-          <el-select v-model="dialogForm.dataSource" placeholder="请选择任务数据源" style="width: 100%">
+        <el-form-item v-if="dialogForm.taskType === 'periodic'" label="任务类型" prop="periodicTaskType">
+          <el-select
+            v-model="dialogForm.periodicTaskType"
+            placeholder="请选择任务类型"
+            style="width: 100%"
+            @change="handlePeriodicTaskTypeChange"
+          >
             <el-option
-              v-for="item in dataSourceOptions"
+              v-for="item in periodicTaskTypeOptions"
               :key="item.value"
               :label="item.label"
               :value="item.value"
+            />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item v-if="dialogForm.taskType === 'periodic'" label="关联数据" prop="dataId">
+          <el-select v-model="dialogForm.dataId" placeholder="请选择数据" style="width: 100%" filterable clearable>
+            <el-option
+              v-for="item in selectableDataOptions"
+              :key="item.id"
+              :label="item.dataName"
+              :value="item.id"
             />
           </el-select>
         </el-form-item>
@@ -192,7 +216,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute } from 'vue-router'
 
@@ -201,11 +225,23 @@ const taskTypeOptions = [
   { label: '周期性任务', value: 'periodic' }
 ]
 
-const dataSourceOptions = [
-  { label: 'MySQL', value: 'mysql' },
-  { label: 'HTTP API', value: 'api' },
-  { label: 'Kafka', value: 'kafka' },
-  { label: '文件导入', value: 'file' }
+const periodicTaskTypeOptions = [
+  { label: '预警', value: 'warning' },
+  { label: '报告', value: 'report' }
+]
+
+const DATA_STORAGE_KEY = 'task-data-records'
+const DEFAULT_DATA_OPTIONS = [
+  {
+    id: 1001,
+    dataName: '省交建局-债权人-明保理池',
+    periodicTaskType: 'report'
+  },
+  {
+    id: 1002,
+    dataName: '权属企业-债务人-暗保理',
+    periodicTaskType: 'warning'
+  }
 ]
 
 const cycleTypeOptions = [
@@ -236,8 +272,10 @@ const pageTaskTypeLabel = computed(() => {
 const queryForm = reactive({
   taskName: '',
   taskType: '',
-  dataSource: ''
+  periodicTaskType: ''
 })
+
+const dataOptions = ref([])
 
 const tasks = ref([
   {
@@ -245,7 +283,6 @@ const tasks = ref([
     taskName: '用户积分补偿',
     taskType: 'manual',
     taskCode: 'MANUAL_USER_POINT_COMPENSATE',
-    dataSource: 'mysql',
     scheduleTime: '',
     status: 'ready',
     createTime: '2026-03-16 10:20:00',
@@ -256,7 +293,8 @@ const tasks = ref([
     taskName: '销售日报汇总',
     taskType: 'periodic',
     taskCode: 'PERIODIC_SALE_DAILY_SUMMARY',
-    dataSource: 'api',
+    periodicTaskType: 'report',
+    dataId: 1001,
     cycleType: 'day',
     cycleValues: [],
     scheduleTime: '09:00:00',
@@ -269,7 +307,8 @@ const tasks = ref([
     taskName: '库存风险扫描',
     taskType: 'periodic',
     taskCode: 'PERIODIC_STOCK_RISK_SCAN',
-    dataSource: 'kafka',
+    periodicTaskType: 'warning',
+    dataId: 1002,
     cycleType: 'week',
     cycleValues: [1, 3, 5],
     scheduleTime: '22:30:00',
@@ -283,9 +322,14 @@ const filteredTasks = computed(() => {
   return tasks.value.filter((task) => {
     if (queryForm.taskName && !task.taskName.includes(queryForm.taskName)) return false
     if (queryForm.taskType && task.taskType !== queryForm.taskType) return false
-    if (queryForm.dataSource && task.dataSource !== queryForm.dataSource) return false
+    if (queryForm.periodicTaskType && task.periodicTaskType !== queryForm.periodicTaskType) return false
     return true
   })
+})
+
+const selectableDataOptions = computed(() => {
+  if (!dialogForm.periodicTaskType) return dataOptions.value
+  return dataOptions.value.filter((item) => item.periodicTaskType === dialogForm.periodicTaskType)
 })
 
 const dialogVisible = ref(false)
@@ -296,7 +340,8 @@ const dialogForm = reactive({
   taskName: '',
   taskType: 'manual',
   taskCode: '',
-  dataSource: '',
+  periodicTaskType: '',
+  dataId: null,
   cycleType: 'day',
   cycleValues: [],
   scheduleTime: ''
@@ -322,7 +367,34 @@ const dialogRules = {
   taskName: [{ required: true, message: '请输入任务名称', trigger: 'blur' }],
   taskType: [{ required: true, message: '请选择任务类型', trigger: 'change' }],
   taskCode: [{ required: true, message: '请输入任务编码', trigger: 'blur' }],
-  dataSource: [{ required: true, message: '请选择任务数据源', trigger: 'change' }],
+  periodicTaskType: [
+    {
+      validator: (_, value, callback) => {
+        if (dialogForm.taskType === 'periodic' && !value) {
+          callback(new Error('请选择任务类型'))
+          return
+        }
+        callback()
+      },
+      trigger: 'change'
+    }
+  ],
+  dataId: [
+    {
+      validator: (_, value, callback) => {
+        if (dialogForm.taskType !== 'periodic') {
+          callback()
+          return
+        }
+        if (!value) {
+          callback(new Error('请选择关联数据'))
+          return
+        }
+        callback()
+      },
+      trigger: 'change'
+    }
+  ],
   cycleType: [
     {
       validator: (_, value, callback) => {
@@ -373,12 +445,37 @@ function taskTypeText(type) {
   return taskTypeOptions.find((item) => item.value === type)?.label || '-'
 }
 
-function dataSourceText(source) {
-  return dataSourceOptions.find((item) => item.value === source)?.label || '-'
+function periodicTaskTypeText(type) {
+  return periodicTaskTypeOptions.find((item) => item.value === type)?.label || '-'
 }
 
 function cycleTypeText(cycleType) {
   return cycleTypeOptions.find((item) => item.value === cycleType)?.label || '-'
+}
+
+function parseLocalDataRecords() {
+  const saved = localStorage.getItem(DATA_STORAGE_KEY)
+  if (!saved) {
+    localStorage.setItem(DATA_STORAGE_KEY, JSON.stringify(DEFAULT_DATA_OPTIONS))
+    return [...DEFAULT_DATA_OPTIONS]
+  }
+  try {
+    const records = JSON.parse(saved)
+    if (Array.isArray(records)) return records
+  } catch {
+    return [...DEFAULT_DATA_OPTIONS]
+  }
+  localStorage.setItem(DATA_STORAGE_KEY, JSON.stringify(DEFAULT_DATA_OPTIONS))
+  return [...DEFAULT_DATA_OPTIONS]
+}
+
+function loadDataOptions() {
+  const records = parseLocalDataRecords()
+  dataOptions.value = records
+}
+
+function dataNameText(dataId) {
+  return dataOptions.value.find((item) => item.id === dataId)?.dataName || '-'
 }
 
 function periodicScheduleText(task) {
@@ -425,7 +522,7 @@ function handleSearch() {
 function handleReset() {
   queryForm.taskName = ''
   queryForm.taskType = fixedTaskType.value || ''
-  queryForm.dataSource = ''
+  queryForm.periodicTaskType = ''
 }
 
 function resetDialogForm() {
@@ -433,25 +530,29 @@ function resetDialogForm() {
   dialogForm.taskName = ''
   dialogForm.taskType = fixedTaskType.value || 'manual'
   dialogForm.taskCode = ''
-  dialogForm.dataSource = ''
+  dialogForm.periodicTaskType = ''
+  dialogForm.dataId = null
   dialogForm.cycleType = 'day'
   dialogForm.cycleValues = []
   dialogForm.scheduleTime = ''
 }
 
 function openCreateDialog() {
+  loadDataOptions()
   isEdit.value = false
   resetDialogForm()
   dialogVisible.value = true
 }
 
 function openEditDialog(row) {
+  loadDataOptions()
   isEdit.value = true
   dialogForm.id = row.id
   dialogForm.taskName = row.taskName
   dialogForm.taskType = row.taskType
   dialogForm.taskCode = row.taskCode
-  dialogForm.dataSource = row.dataSource
+  dialogForm.periodicTaskType = row.periodicTaskType || ''
+  dialogForm.dataId = row.dataId || null
   dialogForm.cycleType = row.cycleType || 'day'
   dialogForm.cycleValues = [...(row.cycleValues || [])]
   dialogForm.scheduleTime = row.scheduleTime || ''
@@ -460,6 +561,8 @@ function openEditDialog(row) {
 
 function handleTaskTypeChange(value) {
   if (value !== 'periodic') {
+    dialogForm.periodicTaskType = ''
+    dialogForm.dataId = null
     dialogForm.cycleType = 'day'
     dialogForm.cycleValues = []
     dialogForm.scheduleTime = ''
@@ -468,6 +571,10 @@ function handleTaskTypeChange(value) {
   if (!dialogForm.cycleType) {
     dialogForm.cycleType = 'day'
   }
+}
+
+function handlePeriodicTaskTypeChange() {
+  dialogForm.dataId = null
 }
 
 function normalizeCycleValues(values = []) {
@@ -500,6 +607,8 @@ async function submitDialog() {
 
   const currentTaskType = fixedTaskType.value || dialogForm.taskType
   const isPeriodic = currentTaskType === 'periodic'
+  const currentPeriodicTaskType = isPeriodic ? dialogForm.periodicTaskType : ''
+  const currentDataId = isPeriodic ? dialogForm.dataId : null
   const currentCycleType = isPeriodic ? dialogForm.cycleType : ''
   const currentCycleValues = isPeriodic ? buildCycleValuesByType(dialogForm.cycleType, dialogForm.cycleValues) : []
   if (isEdit.value) {
@@ -511,7 +620,8 @@ async function submitDialog() {
         taskName: dialogForm.taskName,
         taskType: currentTaskType,
         taskCode: dialogForm.taskCode,
-        dataSource: dialogForm.dataSource,
+        periodicTaskType: currentPeriodicTaskType,
+        dataId: currentDataId,
         cycleType: currentCycleType,
         cycleValues: currentCycleValues,
         scheduleTime: isPeriodic ? dialogForm.scheduleTime : '',
@@ -525,7 +635,8 @@ async function submitDialog() {
       taskName: dialogForm.taskName,
       taskType: currentTaskType,
       taskCode: dialogForm.taskCode,
-      dataSource: dialogForm.dataSource,
+      periodicTaskType: currentPeriodicTaskType,
+      dataId: currentDataId,
       cycleType: currentCycleType,
       cycleValues: currentCycleValues,
       scheduleTime: isPeriodic ? dialogForm.scheduleTime : '',
@@ -554,6 +665,10 @@ function handleResume(row) {
   row.lastRunTime = formatDateTime()
   ElMessage.success(`任务「${row.taskName}」已恢复`)
 }
+
+onMounted(() => {
+  loadDataOptions()
+})
 </script>
 
 <style lang="scss" scoped>
@@ -596,5 +711,6 @@ function handleResume(row) {
   .cycle-checkbox-item {
     margin-right: 0;
   }
+
 }
 </style>

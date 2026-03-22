@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Vue 3 + Element Plus + Vuex 前端模板
 
 基于 Vue 3、Vite、Element Plus、Vue Router 和 Vuex 的前端项目模板。
@@ -54,3 +55,7 @@ npm run preview
 - **表单示例** `/form`：常用表单项、校验、提交/重置
 
 默认账号：`admin` / `123456`（仅前端模拟，未接后端）。
+=======
+# Orange
+It's a framework for Order.
+>>>>>>> 00bab6da8bc09e03e88023bc261456bbd2b990e3

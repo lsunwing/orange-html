@@ -31,10 +31,16 @@
             <span class="menu-title-text">任务管理</span>
           </template>
           <el-menu-item index="/task/manual">
+            <el-icon><EditPen /></el-icon>
             <template #title>手动任务</template>
           </el-menu-item>
           <el-menu-item index="/task/periodic">
+            <el-icon><Timer /></el-icon>
             <template #title>周期任务</template>
+          </el-menu-item>
+          <el-menu-item index="/task/data">
+            <el-icon><Files /></el-icon>
+            <template #title>数据管理</template>
           </el-menu-item>
         </el-sub-menu>
         <el-sub-menu index="system">
@@ -90,7 +96,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useStore } from 'vuex'
-import { HomeFilled, Grid, Document, List, Fold, Expand, ArrowDown, Setting } from '@element-plus/icons-vue'
+import { HomeFilled, Grid, Document, List, Fold, Expand, ArrowDown, Setting, EditPen, Timer, Files } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
