@@ -53,24 +53,9 @@
           <template #default="{ $index }">{{ $index + 1 }}</template>
         </el-table-column>
         <el-table-column prop="taskName" label="任务名称" min-width="150" />
-        <el-table-column label="任务类型" width="110">
-          <template #default="{ row }">
-            <el-tag :type="row.taskType === 'manual' ? 'info' : 'success'">
-              {{ taskTypeText(row.taskType) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="周期任务类型" min-width="140">
-          <template #default="{ row }">
-            {{ row.taskType === 'periodic' ? periodicTaskTypeText(row.periodicTaskType) : '-' }}
-          </template>
-        </el-table-column>
         <el-table-column prop="taskCode" label="任务编码" min-width="180" show-overflow-tooltip />
-        <el-table-column label="关联数据" min-width="220">
-          <template #default="{ row }">{{ row.taskType === 'periodic' ? dataNameText(row.dataId) : '-' }}</template>
-        </el-table-column>
-        <el-table-column label="周期执行配置" min-width="240">
-          <template #default="{ row }">{{ row.taskType === 'periodic' ? periodicScheduleText(row) : '-' }}</template>
+        <el-table-column label="数据源" min-width="220">
+          <template #default="{ row }">{{ row.taskType === 'manual' ? dataNameText(row.dataSourceId) : dataNameText(row.dataId) }}</template>
         </el-table-column>
         <el-table-column label="任务状态" width="110">
           <template #default="{ row }">
@@ -80,7 +65,14 @@
         <el-table-column prop="lastRunTime" label="最近执行时间" min-width="170" />
         <el-table-column label="操作" width="230" fixed="right">
           <template #default="{ row }">
-            <el-button v-if="row.taskType === 'manual'" type="primary" link @click="handleStart(row)">手动启动</el-button>
+            <el-button
+              v-if="row.taskType === 'manual' && row.status !== 'disabled'"
+              type="primary"
+              link
+              @click="handleStart(row)"
+            >
+              手动启动
+            </el-button>
             <el-button
               v-if="row.taskType === 'periodic' && row.status === 'running'"
               type="warning"
@@ -122,6 +114,28 @@
 
         <el-form-item label="任务编码" prop="taskCode">
           <el-input v-model="dialogForm.taskCode" placeholder="请输入任务编码" />
+        </el-form-item>
+
+        <el-form-item v-if="dialogForm.taskType === 'manual'" label="数据源" prop="dataSourceId">
+          <el-select v-model="dialogForm.dataSourceId" placeholder="请选择数据源" style="width: 100%" filterable clearable>
+            <el-option
+              v-for="item in manualDataOptions"
+              :key="item.id"
+              :label="item.dataName"
+              :value="item.id"
+            />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item v-if="dialogForm.taskType === 'manual'" label="任务状态" prop="manualStatus">
+          <el-select v-model="dialogForm.manualStatus" placeholder="请选择任务状态" style="width: 100%">
+            <el-option
+              v-for="item in manualStatusOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
         </el-form-item>
 
         <el-form-item v-if="dialogForm.taskType === 'periodic'" label="任务类型" prop="periodicTaskType">
@@ -230,17 +244,24 @@ const periodicTaskTypeOptions = [
   { label: '报告', value: 'report' }
 ]
 
+const manualStatusOptions = [
+  { label: '可启动', value: 'ready' },
+  { label: '已停用', value: 'disabled' }
+]
+
 const DATA_STORAGE_KEY = 'task-data-records'
 const DEFAULT_DATA_OPTIONS = [
   {
     id: 1001,
-    dataName: '省交建局-债权人-明保理池',
-    periodicTaskType: 'report'
+    dataName: '省交建局报告源',
+    ownerType: 'periodic',
+    taskType: 'report'
   },
   {
     id: 1002,
-    dataName: '权属企业-债务人-暗保理',
-    periodicTaskType: 'warning'
+    dataName: '企查查失信核查源',
+    ownerType: 'manual',
+    taskType: 'qcc_dishonest'
   }
 ]
 
@@ -283,6 +304,7 @@ const tasks = ref([
     taskName: '用户积分补偿',
     taskType: 'manual',
     taskCode: 'MANUAL_USER_POINT_COMPENSATE',
+    dataSourceId: 1001,
     scheduleTime: '',
     status: 'ready',
     createTime: '2026-03-16 10:20:00',
@@ -328,8 +350,13 @@ const filteredTasks = computed(() => {
 })
 
 const selectableDataOptions = computed(() => {
-  if (!dialogForm.periodicTaskType) return dataOptions.value
-  return dataOptions.value.filter((item) => item.periodicTaskType === dialogForm.periodicTaskType)
+  const periodicOptions = dataOptions.value.filter((item) => item.ownerType === 'periodic')
+  if (!dialogForm.periodicTaskType) return periodicOptions
+  return periodicOptions.filter((item) => item.taskType === dialogForm.periodicTaskType || !item.taskType)
+})
+
+const manualDataOptions = computed(() => {
+  return dataOptions.value.filter((item) => item.ownerType === 'manual')
 })
 
 const dialogVisible = ref(false)
@@ -340,6 +367,8 @@ const dialogForm = reactive({
   taskName: '',
   taskType: 'manual',
   taskCode: '',
+  dataSourceId: null,
+  manualStatus: 'ready',
   periodicTaskType: '',
   dataId: null,
   cycleType: 'day',
@@ -367,6 +396,30 @@ const dialogRules = {
   taskName: [{ required: true, message: '请输入任务名称', trigger: 'blur' }],
   taskType: [{ required: true, message: '请选择任务类型', trigger: 'change' }],
   taskCode: [{ required: true, message: '请输入任务编码', trigger: 'blur' }],
+  dataSourceId: [
+    {
+      validator: (_, value, callback) => {
+        if (dialogForm.taskType === 'manual' && !value) {
+          callback(new Error('请选择数据源'))
+          return
+        }
+        callback()
+      },
+      trigger: 'change'
+    }
+  ],
+  manualStatus: [
+    {
+      validator: (_, value, callback) => {
+        if (dialogForm.taskType === 'manual' && !value) {
+          callback(new Error('请选择任务状态'))
+          return
+        }
+        callback()
+      },
+      trigger: 'change'
+    }
+  ],
   periodicTaskType: [
     {
       validator: (_, value, callback) => {
@@ -461,7 +514,13 @@ function parseLocalDataRecords() {
   }
   try {
     const records = JSON.parse(saved)
-    if (Array.isArray(records)) return records
+    if (Array.isArray(records)) {
+      return records.map((item) => ({
+        ...item,
+        ownerType: item.ownerType || 'periodic',
+        taskType: item.taskType || item.periodicTaskType || ''
+      }))
+    }
   } catch {
     return [...DEFAULT_DATA_OPTIONS]
   }
@@ -497,6 +556,9 @@ function periodicScheduleText(task) {
 
 function statusInfo(task) {
   if (task.taskType === 'manual') {
+    if (task.status === 'disabled') {
+      return { label: '已停用', type: 'info' }
+    }
     return { label: '可启动', type: 'info' }
   }
   return task.status === 'running'
@@ -530,6 +592,8 @@ function resetDialogForm() {
   dialogForm.taskName = ''
   dialogForm.taskType = fixedTaskType.value || 'manual'
   dialogForm.taskCode = ''
+  dialogForm.dataSourceId = null
+  dialogForm.manualStatus = 'ready'
   dialogForm.periodicTaskType = ''
   dialogForm.dataId = null
   dialogForm.cycleType = 'day'
@@ -551,6 +615,8 @@ function openEditDialog(row) {
   dialogForm.taskName = row.taskName
   dialogForm.taskType = row.taskType
   dialogForm.taskCode = row.taskCode
+  dialogForm.dataSourceId = row.dataSourceId || null
+  dialogForm.manualStatus = row.status || 'ready'
   dialogForm.periodicTaskType = row.periodicTaskType || ''
   dialogForm.dataId = row.dataId || null
   dialogForm.cycleType = row.cycleType || 'day'
@@ -568,6 +634,8 @@ function handleTaskTypeChange(value) {
     dialogForm.scheduleTime = ''
     return
   }
+  dialogForm.dataSourceId = null
+  dialogForm.manualStatus = 'ready'
   if (!dialogForm.cycleType) {
     dialogForm.cycleType = 'day'
   }
@@ -607,6 +675,9 @@ async function submitDialog() {
 
   const currentTaskType = fixedTaskType.value || dialogForm.taskType
   const isPeriodic = currentTaskType === 'periodic'
+  const isManual = currentTaskType === 'manual'
+  const currentDataSourceId = isManual ? dialogForm.dataSourceId : null
+  const currentManualStatus = isManual ? dialogForm.manualStatus : 'ready'
   const currentPeriodicTaskType = isPeriodic ? dialogForm.periodicTaskType : ''
   const currentDataId = isPeriodic ? dialogForm.dataId : null
   const currentCycleType = isPeriodic ? dialogForm.cycleType : ''
@@ -620,12 +691,13 @@ async function submitDialog() {
         taskName: dialogForm.taskName,
         taskType: currentTaskType,
         taskCode: dialogForm.taskCode,
+        dataSourceId: currentDataSourceId,
         periodicTaskType: currentPeriodicTaskType,
         dataId: currentDataId,
         cycleType: currentCycleType,
         cycleValues: currentCycleValues,
         scheduleTime: isPeriodic ? dialogForm.scheduleTime : '',
-        status: isPeriodic ? (original.taskType === 'periodic' ? original.status : 'running') : 'ready'
+        status: isPeriodic ? (original.taskType === 'periodic' ? original.status : 'running') : currentManualStatus
       }
     }
     ElMessage.success('任务修改成功')
@@ -635,12 +707,13 @@ async function submitDialog() {
       taskName: dialogForm.taskName,
       taskType: currentTaskType,
       taskCode: dialogForm.taskCode,
+      dataSourceId: currentDataSourceId,
       periodicTaskType: currentPeriodicTaskType,
       dataId: currentDataId,
       cycleType: currentCycleType,
       cycleValues: currentCycleValues,
       scheduleTime: isPeriodic ? dialogForm.scheduleTime : '',
-      status: isPeriodic ? 'running' : 'ready',
+      status: isPeriodic ? 'running' : currentManualStatus,
       createTime: formatDateTime(),
       lastRunTime: '-'
     })

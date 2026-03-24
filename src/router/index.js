@@ -52,7 +52,7 @@ const routes = [
             path: 'data',
             name: 'DataManage',
             component: () => import('@/views/task/data/index.vue'),
-            meta: { title: '数据管理' }
+            meta: { title: '数据源管理' }
           }
         ]
       },

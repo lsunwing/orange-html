@@ -40,7 +40,7 @@
           </el-menu-item>
           <el-menu-item index="/task/data">
             <el-icon><Files /></el-icon>
-            <template #title>数据管理</template>
+            <template #title>数据源管理</template>
           </el-menu-item>
         </el-sub-menu>
         <el-sub-menu index="system">
@@ -49,15 +49,19 @@
             <span class="menu-title-text">系统管理</span>
           </template>
           <el-menu-item index="/system/user">
+            <el-icon><User /></el-icon>
             <template #title>用户管理</template>
           </el-menu-item>
           <el-menu-item index="/system/role">
+            <el-icon><UserFilled /></el-icon>
             <template #title>角色管理</template>
           </el-menu-item>
           <el-menu-item index="/system/department">
+            <el-icon><OfficeBuilding /></el-icon>
             <template #title>部门管理</template>
           </el-menu-item>
           <el-menu-item index="/system/permission">
+            <el-icon><Lock /></el-icon>
             <template #title>权限管理</template>
           </el-menu-item>
         </el-sub-menu>
@@ -96,7 +100,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useStore } from 'vuex'
-import { HomeFilled, Grid, Document, List, Fold, Expand, ArrowDown, Setting, EditPen, Timer, Files } from '@element-plus/icons-vue'
+import { HomeFilled, Grid, Document, List, Fold, Expand, ArrowDown, Setting, EditPen, Timer, Files, User, UserFilled, OfficeBuilding, Lock } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()

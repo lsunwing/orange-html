@@ -1,61 +1,53 @@
 <template>
-  <div class="data-page">
+  <div class="data-source-page">
     <el-card class="card" shadow="never">
       <template #header>
-        <span>数据管理</span>
+        <span>数据源管理</span>
       </template>
 
       <el-form :model="queryForm" inline label-width="90px" class="query-form">
-        <el-form-item label="数据名称">
-          <el-input v-model="queryForm.dataName" placeholder="请输入数据名称" clearable style="width: 220px" />
+        <el-form-item label="数据源名称">
+          <el-input v-model="queryForm.dataName" placeholder="请输入数据源名称" clearable style="width: 220px" />
+        </el-form-item>
+        <el-form-item label="数据源归属">
+          <el-select v-model="queryForm.ownerType" placeholder="请选择归属" clearable style="width: 180px">
+            <el-option v-for="item in ownerTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
         </el-form-item>
         <el-form-item label="任务类型">
-          <el-select v-model="queryForm.periodicTaskType" placeholder="请选择任务类型" clearable style="width: 180px">
-            <el-option v-for="item in periodicTaskTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
+          <el-select v-model="queryForm.taskType" placeholder="请选择任务类型" clearable style="width: 220px">
+            <el-option v-for="item in taskTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
         <el-form-item class="query-actions">
           <el-button type="primary" @click="handleSearch">查询</el-button>
           <el-button @click="handleReset">重置</el-button>
-          <el-button type="success" @click="openCreateDialog">新增数据</el-button>
+          <el-button type="success" @click="openCreateDialog">新增数据源</el-button>
         </el-form-item>
       </el-form>
     </el-card>
 
     <el-card class="card" shadow="never">
       <template #header>
-        <span>数据列表</span>
+        <span>数据源列表</span>
       </template>
 
       <el-table :data="filteredRecords" stripe style="width: 100%">
         <el-table-column label="序号" width="70">
           <template #default="{ $index }">{{ $index + 1 }}</template>
         </el-table-column>
-        <el-table-column prop="dataName" label="数据名称" min-width="180" />
-        <el-table-column label="任务类型" width="100">
-          <template #default="{ row }">{{ periodicTaskTypeText(row.periodicTaskType) }}</template>
+        <el-table-column prop="dataName" label="数据源名称" min-width="200" />
+        <el-table-column label="数据源归属" min-width="120">
+          <template #default="{ row }">{{ optionText(ownerTypeOptions, row.ownerType) }}</template>
         </el-table-column>
-        <el-table-column label="业务板块" min-width="190">
-          <template #default="{ row }">{{ optionText(businessSegmentOptions, row.businessSegment) }}</template>
+        <el-table-column label="任务类型" min-width="180">
+          <template #default="{ row }">{{ optionText(taskTypeOptions, row.taskType) }}</template>
         </el-table-column>
-        <el-table-column label="项目角色" min-width="110">
-          <template #default="{ row }">{{ optionText(projectRoleOptions, row.projectRole) }}</template>
+        <el-table-column label="关联事件" min-width="180">
+          <template #default="{ row }">{{ row.taskType === 'warning' ? optionText(eventOptions, row.eventId) : '-' }}</template>
         </el-table-column>
-        <el-table-column label="有无追索" min-width="100">
-          <template #default="{ row }">{{ optionText(yesNoOptions, row.recourseFlag) }}</template>
-        </el-table-column>
-        <el-table-column label="明暗类型" min-width="110">
-          <template #default="{ row }">{{ optionText(factoringTypeOptions, row.factoringType) }}</template>
-        </el-table-column>
-        <el-table-column label="应收账款" min-width="150">
-          <template #default="{ row }">{{ optionText(receivableTypeOptions, row.receivableType) }}</template>
-        </el-table-column>
-        <el-table-column label="池模式" min-width="90">
-          <template #default="{ row }">{{ optionText(yesNoOptions, row.poolMode) }}</template>
-        </el-table-column>
-        <el-table-column label="直接/间接保理" min-width="140">
-          <template #default="{ row }">{{ optionText(factoringModeOptions, row.factoringMode) }}</template>
-        </el-table-column>
+        <el-table-column prop="previewCount" label="筛选数据量" min-width="110" />
+        <el-table-column prop="updateTime" label="更新时间" min-width="180" />
         <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link @click="openEditDialog(row)">编辑</el-button>
@@ -65,17 +57,28 @@
       </el-table>
     </el-card>
 
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑数据' : '新增数据'" width="980px" @closed="handleDialogClosed">
-      <el-form ref="dialogFormRef" :model="dialogForm" :rules="dialogRules" label-width="100px">
-        <el-form-item label="数据名称" prop="dataName">
-          <el-input v-model="dialogForm.dataName" placeholder="请输入数据名称" />
+    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑数据源' : '新增数据源'" width="980px" @closed="handleDialogClosed">
+      <el-form ref="dialogFormRef" :model="dialogForm" :rules="dialogRules" label-width="110px">
+        <el-form-item label="数据源名称" prop="dataName">
+          <el-input v-model="dialogForm.dataName" placeholder="请输入数据源名称" />
         </el-form-item>
-        <el-form-item label="任务类型" prop="periodicTaskType">
-          <el-select v-model="dialogForm.periodicTaskType" placeholder="请选择任务类型" style="width: 100%">
-            <el-option v-for="item in periodicTaskTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
+        <el-form-item label="数据源归属" prop="ownerType">
+          <el-select v-model="dialogForm.ownerType" placeholder="请选择数据源归属" style="width: 100%">
+            <el-option v-for="item in ownerTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
-        <el-form-item label="筛选条件" prop="businessSegment">
+        <el-form-item label="任务类型" prop="taskType">
+          <el-select v-model="dialogForm.taskType" placeholder="请选择任务类型" style="width: 100%">
+            <el-option v-for="item in taskTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="dialogForm.taskType === 'warning'" label="关联事件" prop="eventId">
+          <el-select v-model="dialogForm.eventId" placeholder="请选择关联事件" style="width: 100%">
+            <el-option v-for="item in eventOptions" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item v-if="isProjectTaskType" label="项目筛选条件" prop="businessSegment">
           <div class="filter-grid">
             <el-select v-model="dialogForm.businessSegment" placeholder="请选择业务板块" class="filter-item">
               <el-option v-for="item in businessSegmentOptions" :key="item.value" :label="item.label" :value="item.value" />
@@ -100,15 +103,27 @@
             </el-select>
           </div>
         </el-form-item>
+
+        <el-form-item v-else label="企业筛选条件" prop="companyName">
+          <div class="filter-grid">
+            <el-input v-model="dialogForm.companyName" placeholder="请输入企业名称" class="filter-item" />
+            <el-input v-model="dialogForm.companyCode" placeholder="请输入统一社会信用代码" class="filter-item" />
+          </div>
+        </el-form-item>
+
         <el-form-item label="筛选结果">
           <el-table :data="previewRows" stripe border max-height="260" style="width: 100%">
             <el-table-column label="序号" width="60">
               <template #default="{ $index }">{{ $index + 1 }}</template>
             </el-table-column>
-            <el-table-column prop="projectName" label="项目名称" min-width="180" />
-            <el-table-column prop="counterparty" label="交易对手" min-width="120" />
-            <el-table-column prop="amount" label="金额(万元)" min-width="120" />
-            <el-table-column prop="dueDate" label="到期日" min-width="120" />
+            <el-table-column v-if="isProjectTaskType" prop="projectName" label="项目名称" min-width="180" />
+            <el-table-column v-if="isProjectTaskType" prop="counterparty" label="交易对手" min-width="120" />
+            <el-table-column v-if="isProjectTaskType" prop="amount" label="金额(万元)" min-width="120" />
+            <el-table-column v-if="isProjectTaskType" prop="dueDate" label="到期日" min-width="120" />
+            <el-table-column v-if="!isProjectTaskType" prop="companyName" label="企业名称" min-width="220" />
+            <el-table-column v-if="!isProjectTaskType" prop="companyCode" label="统一社会信用代码" min-width="200" />
+            <el-table-column v-if="!isProjectTaskType" prop="riskLevel" label="风险等级" min-width="100" />
+            <el-table-column v-if="!isProjectTaskType" prop="industry" label="行业" min-width="120" />
           </el-table>
         </el-form-item>
       </el-form>
@@ -126,9 +141,23 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 
 const DATA_STORAGE_KEY = 'task-data-records'
 
-const periodicTaskTypeOptions = [
+const ownerTypeOptions = [
+  { label: '手动任务', value: 'manual' },
+  { label: '周期任务', value: 'periodic' }
+]
+
+const taskTypeOptions = [
   { label: '预警', value: 'warning' },
-  { label: '报告', value: 'report' }
+  { label: '报告', value: 'report' },
+  { label: '企查查（企业信息核查）', value: 'qcc_basic' },
+  { label: '企查查（失信核查）', value: 'qcc_dishonest' },
+  { label: '企业预警通（新闻）', value: 'news_warning' }
+]
+
+const eventOptions = [
+  { label: '融资预警事件', value: 'finance_warning' },
+  { label: '合同履约事件', value: 'contract_event' },
+  { label: '回款异常事件', value: 'repayment_issue' }
 ]
 
 const businessSegmentOptions = [
@@ -164,10 +193,10 @@ const factoringModeOptions = [
   { label: '间接', value: 'indirect' }
 ]
 
-const rawDataPool = [
+const projectDataPool = [
   {
     id: 1,
-    periodicTaskType: 'report',
+    taskType: 'report',
     businessSegment: 'project-construction',
     projectRole: 'creditor',
     recourseFlag: 'yes',
@@ -182,7 +211,7 @@ const rawDataPool = [
   },
   {
     id: 2,
-    periodicTaskType: 'report',
+    taskType: 'report',
     businessSegment: 'project-construction',
     projectRole: 'creditor',
     recourseFlag: 'yes',
@@ -197,7 +226,7 @@ const rawDataPool = [
   },
   {
     id: 3,
-    periodicTaskType: 'warning',
+    taskType: 'warning',
     businessSegment: 'subsidiary-enterprise',
     projectRole: 'debtor',
     recourseFlag: 'no',
@@ -209,93 +238,130 @@ const rawDataPool = [
     counterparty: '权属企业集团',
     amount: 540,
     dueDate: '2026-07-20'
+  }
+]
+
+const enterpriseDataPool = [
+  {
+    id: 101,
+    taskType: 'qcc_basic',
+    companyName: '深圳市深投建设有限公司',
+    companyCode: '91440300123456789A',
+    riskLevel: '中',
+    industry: '建筑'
   },
   {
-    id: 4,
-    periodicTaskType: 'warning',
-    businessSegment: 'urban-renewal',
-    projectRole: 'guarantor',
-    recourseFlag: 'yes',
-    factoringType: 'dark',
-    receivableType: 'existing',
-    poolMode: 'yes',
-    factoringMode: 'indirect',
-    projectName: '园区开发保障项目D',
-    counterparty: '城更平台公司',
-    amount: 980,
-    dueDate: '2026-10-01'
+    id: 102,
+    taskType: 'qcc_dishonest',
+    companyName: '广东华信实业有限公司',
+    companyCode: '91440000765432109X',
+    riskLevel: '高',
+    industry: '制造'
   },
   {
-    id: 5,
-    periodicTaskType: 'report',
-    businessSegment: 'subsidiary-enterprise',
-    projectRole: 'creditor',
-    recourseFlag: 'no',
-    factoringType: 'open',
-    receivableType: 'existing_or_future',
-    poolMode: 'yes',
-    factoringMode: 'direct',
-    projectName: '权属企业渠道扩展项目E',
-    counterparty: '权属企业集团',
-    amount: 430,
-    dueDate: '2026-08-18'
+    id: 103,
+    taskType: 'news_warning',
+    companyName: '广州城发产业运营集团',
+    companyCode: '91440100ABCDEF1234',
+    riskLevel: '中',
+    industry: '园区运营'
   },
   {
-    id: 6,
-    periodicTaskType: 'warning',
-    businessSegment: 'project-construction',
-    projectRole: 'debtor',
-    recourseFlag: 'yes',
-    factoringType: 'open',
-    receivableType: 'future',
-    poolMode: 'no',
-    factoringMode: 'direct',
-    projectName: '省交建局应收预警项目F',
-    counterparty: '省交建局',
-    amount: 760,
-    dueDate: '2026-06-28'
+    id: 104,
+    taskType: 'qcc_basic',
+    companyName: '深圳市云桥科技股份有限公司',
+    companyCode: '91440300QWERTY5678',
+    riskLevel: '低',
+    industry: '信息技术'
   }
 ]
 
 const defaultRecords = [
   {
     id: 1001,
-    dataName: '省交建局-债权人-明保理池',
-    periodicTaskType: 'report',
+    dataName: '省交建局报告源',
+    ownerType: 'periodic',
+    taskType: 'report',
+    eventId: '',
     businessSegment: 'project-construction',
     projectRole: 'creditor',
     recourseFlag: 'yes',
     factoringType: 'open',
     receivableType: 'existing',
     poolMode: 'yes',
-    factoringMode: 'direct'
+    factoringMode: 'direct',
+    companyName: '',
+    companyCode: '',
+    previewCount: 2,
+    updateTime: '2026-03-24 10:00:00'
   },
   {
     id: 1002,
-    dataName: '权属企业-债务人-暗保理',
-    periodicTaskType: 'warning',
-    businessSegment: 'subsidiary-enterprise',
-    projectRole: 'debtor',
-    recourseFlag: 'no',
-    factoringType: 'dark',
-    receivableType: 'existing_or_future',
-    poolMode: 'no',
-    factoringMode: 'indirect'
+    dataName: '企查查失信核查源',
+    ownerType: 'manual',
+    taskType: 'qcc_dishonest',
+    eventId: '',
+    businessSegment: '',
+    projectRole: '',
+    recourseFlag: '',
+    factoringType: '',
+    receivableType: '',
+    poolMode: '',
+    factoringMode: '',
+    companyName: '广东',
+    companyCode: '',
+    previewCount: 1,
+    updateTime: '2026-03-24 11:20:00'
   }
 ]
+
+function nowDateTime() {
+  const pad = (value) => String(value).padStart(2, '0')
+  const date = new Date()
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
+function normalizeRecord(record) {
+  const oldTaskType = record.periodicTaskType || ''
+  const taskType = record.taskType || oldTaskType || 'report'
+  return {
+    id: record.id,
+    dataName: record.dataName || '',
+    ownerType: record.ownerType || 'periodic',
+    taskType,
+    eventId: record.eventId || '',
+    businessSegment: record.businessSegment || '',
+    projectRole: record.projectRole || '',
+    recourseFlag: record.recourseFlag || '',
+    factoringType: record.factoringType || '',
+    receivableType: record.receivableType || '',
+    poolMode: record.poolMode || '',
+    factoringMode: record.factoringMode || '',
+    companyName: record.companyName || '',
+    companyCode: record.companyCode || '',
+    previewCount: record.previewCount || 0,
+    updateTime: record.updateTime || nowDateTime()
+  }
+}
 
 function loadRecords() {
   const saved = localStorage.getItem(DATA_STORAGE_KEY)
   if (!saved) {
-    localStorage.setItem(DATA_STORAGE_KEY, JSON.stringify(defaultRecords))
-    return [...defaultRecords]
+    const initial = defaultRecords.map(normalizeRecord)
+    localStorage.setItem(DATA_STORAGE_KEY, JSON.stringify(initial))
+    return initial
   }
   try {
     const parsed = JSON.parse(saved)
-    if (Array.isArray(parsed)) return parsed
+    if (Array.isArray(parsed)) {
+      const normalized = parsed.map(normalizeRecord)
+      localStorage.setItem(DATA_STORAGE_KEY, JSON.stringify(normalized))
+      return normalized
+    }
   } catch {}
-  localStorage.setItem(DATA_STORAGE_KEY, JSON.stringify(defaultRecords))
-  return [...defaultRecords]
+  const fallback = defaultRecords.map(normalizeRecord)
+  localStorage.setItem(DATA_STORAGE_KEY, JSON.stringify(fallback))
+  return fallback
 }
 
 const records = ref(loadRecords())
@@ -306,7 +372,8 @@ function saveRecords() {
 
 const queryForm = reactive({
   dataName: '',
-  periodicTaskType: ''
+  ownerType: '',
+  taskType: ''
 })
 
 const dialogVisible = ref(false)
@@ -315,46 +382,175 @@ const dialogFormRef = ref(null)
 const dialogForm = reactive({
   id: null,
   dataName: '',
-  periodicTaskType: '',
+  ownerType: 'periodic',
+  taskType: 'report',
+  eventId: '',
   businessSegment: '',
   projectRole: '',
   recourseFlag: '',
   factoringType: '',
   receivableType: '',
   poolMode: '',
-  factoringMode: ''
+  factoringMode: '',
+  companyName: '',
+  companyCode: ''
 })
 
+const isProjectTaskType = computed(() => ['warning', 'report'].includes(dialogForm.taskType))
+
 const dialogRules = {
-  dataName: [{ required: true, message: '请输入数据名称', trigger: 'blur' }],
-  periodicTaskType: [{ required: true, message: '请选择任务类型', trigger: 'change' }],
-  businessSegment: [{ required: true, message: '请选择业务板块', trigger: 'change' }],
-  projectRole: [{ required: true, message: '请选择项目角色', trigger: 'change' }],
-  recourseFlag: [{ required: true, message: '请选择有无追索', trigger: 'change' }],
-  factoringType: [{ required: true, message: '请选择明暗类型', trigger: 'change' }],
-  receivableType: [{ required: true, message: '请选择应收账款类型', trigger: 'change' }],
-  poolMode: [{ required: true, message: '请选择池模式', trigger: 'change' }],
-  factoringMode: [{ required: true, message: '请选择直接/间接保理', trigger: 'change' }]
+  dataName: [{ required: true, message: '请输入数据源名称', trigger: 'blur' }],
+  ownerType: [{ required: true, message: '请选择数据源归属', trigger: 'change' }],
+  taskType: [{ required: true, message: '请选择任务类型', trigger: 'change' }],
+  eventId: [
+    {
+      validator: (_, value, callback) => {
+        if (dialogForm.taskType === 'warning' && !value) {
+          callback(new Error('请选择关联事件'))
+          return
+        }
+        callback()
+      },
+      trigger: 'change'
+    }
+  ],
+  businessSegment: [
+    {
+      validator: (_, value, callback) => {
+        if (isProjectTaskType.value && !value) {
+          callback(new Error('请选择业务板块'))
+          return
+        }
+        callback()
+      },
+      trigger: 'change'
+    }
+  ],
+  projectRole: [
+    {
+      validator: (_, value, callback) => {
+        if (isProjectTaskType.value && !value) {
+          callback(new Error('请选择项目角色'))
+          return
+        }
+        callback()
+      },
+      trigger: 'change'
+    }
+  ],
+  recourseFlag: [
+    {
+      validator: (_, value, callback) => {
+        if (isProjectTaskType.value && !value) {
+          callback(new Error('请选择有无追索'))
+          return
+        }
+        callback()
+      },
+      trigger: 'change'
+    }
+  ],
+  factoringType: [
+    {
+      validator: (_, value, callback) => {
+        if (isProjectTaskType.value && !value) {
+          callback(new Error('请选择明暗类型'))
+          return
+        }
+        callback()
+      },
+      trigger: 'change'
+    }
+  ],
+  receivableType: [
+    {
+      validator: (_, value, callback) => {
+        if (isProjectTaskType.value && !value) {
+          callback(new Error('请选择应收账款类型'))
+          return
+        }
+        callback()
+      },
+      trigger: 'change'
+    }
+  ],
+  poolMode: [
+    {
+      validator: (_, value, callback) => {
+        if (isProjectTaskType.value && !value) {
+          callback(new Error('请选择池模式'))
+          return
+        }
+        callback()
+      },
+      trigger: 'change'
+    }
+  ],
+  factoringMode: [
+    {
+      validator: (_, value, callback) => {
+        if (isProjectTaskType.value && !value) {
+          callback(new Error('请选择直接/间接保理'))
+          return
+        }
+        callback()
+      },
+      trigger: 'change'
+    }
+  ],
+  companyName: [
+    {
+      validator: (_, value, callback) => {
+        if (!isProjectTaskType.value && !value && !dialogForm.companyCode) {
+          callback(new Error('企业名称或统一社会信用代码至少填写一项'))
+          return
+        }
+        callback()
+      },
+      trigger: 'blur'
+    }
+  ],
+  companyCode: [
+    {
+      validator: (_, value, callback) => {
+        if (!isProjectTaskType.value && !value && !dialogForm.companyName) {
+          callback(new Error('企业名称或统一社会信用代码至少填写一项'))
+          return
+        }
+        callback()
+      },
+      trigger: 'blur'
+    }
+  ]
 }
 
 const filteredRecords = computed(() =>
   records.value.filter((item) => {
     if (queryForm.dataName && !item.dataName.includes(queryForm.dataName)) return false
-    if (queryForm.periodicTaskType && item.periodicTaskType !== queryForm.periodicTaskType) return false
+    if (queryForm.ownerType && item.ownerType !== queryForm.ownerType) return false
+    if (queryForm.taskType && item.taskType !== queryForm.taskType) return false
     return true
   })
 )
 
 const previewRows = computed(() => {
-  return rawDataPool.filter((item) => {
-    if (dialogForm.periodicTaskType && item.periodicTaskType !== dialogForm.periodicTaskType) return false
-    if (dialogForm.businessSegment && item.businessSegment !== dialogForm.businessSegment) return false
-    if (dialogForm.projectRole && item.projectRole !== dialogForm.projectRole) return false
-    if (dialogForm.recourseFlag && item.recourseFlag !== dialogForm.recourseFlag) return false
-    if (dialogForm.factoringType && item.factoringType !== dialogForm.factoringType) return false
-    if (dialogForm.receivableType && item.receivableType !== dialogForm.receivableType) return false
-    if (dialogForm.poolMode && item.poolMode !== dialogForm.poolMode) return false
-    if (dialogForm.factoringMode && item.factoringMode !== dialogForm.factoringMode) return false
+  if (isProjectTaskType.value) {
+    return projectDataPool.filter((item) => {
+      if (dialogForm.taskType && item.taskType !== dialogForm.taskType) return false
+      if (dialogForm.businessSegment && item.businessSegment !== dialogForm.businessSegment) return false
+      if (dialogForm.projectRole && item.projectRole !== dialogForm.projectRole) return false
+      if (dialogForm.recourseFlag && item.recourseFlag !== dialogForm.recourseFlag) return false
+      if (dialogForm.factoringType && item.factoringType !== dialogForm.factoringType) return false
+      if (dialogForm.receivableType && item.receivableType !== dialogForm.receivableType) return false
+      if (dialogForm.poolMode && item.poolMode !== dialogForm.poolMode) return false
+      if (dialogForm.factoringMode && item.factoringMode !== dialogForm.factoringMode) return false
+      return true
+    })
+  }
+  return enterpriseDataPool.filter((item) => {
+    if (dialogForm.taskType && item.taskType !== dialogForm.taskType) return false
+    if (dialogForm.companyName && !item.companyName.includes(dialogForm.companyName)) return false
+    if (dialogForm.companyCode && !item.companyCode.includes(dialogForm.companyCode)) return false
     return true
   })
 })
@@ -363,14 +559,12 @@ function optionText(options, value) {
   return options.find((item) => item.value === value)?.label || '-'
 }
 
-function periodicTaskTypeText(value) {
-  return optionText(periodicTaskTypeOptions, value)
-}
-
 function resetDialogForm() {
   dialogForm.id = null
   dialogForm.dataName = ''
-  dialogForm.periodicTaskType = ''
+  dialogForm.ownerType = 'periodic'
+  dialogForm.taskType = 'report'
+  dialogForm.eventId = ''
   dialogForm.businessSegment = ''
   dialogForm.projectRole = ''
   dialogForm.recourseFlag = ''
@@ -378,6 +572,8 @@ function resetDialogForm() {
   dialogForm.receivableType = ''
   dialogForm.poolMode = ''
   dialogForm.factoringMode = ''
+  dialogForm.companyName = ''
+  dialogForm.companyCode = ''
 }
 
 function openCreateDialog() {
@@ -390,14 +586,18 @@ function openEditDialog(row) {
   isEdit.value = true
   dialogForm.id = row.id
   dialogForm.dataName = row.dataName
-  dialogForm.periodicTaskType = row.periodicTaskType
-  dialogForm.businessSegment = row.businessSegment
-  dialogForm.projectRole = row.projectRole
-  dialogForm.recourseFlag = row.recourseFlag
-  dialogForm.factoringType = row.factoringType
-  dialogForm.receivableType = row.receivableType
-  dialogForm.poolMode = row.poolMode
-  dialogForm.factoringMode = row.factoringMode
+  dialogForm.ownerType = row.ownerType
+  dialogForm.taskType = row.taskType
+  dialogForm.eventId = row.eventId || ''
+  dialogForm.businessSegment = row.businessSegment || ''
+  dialogForm.projectRole = row.projectRole || ''
+  dialogForm.recourseFlag = row.recourseFlag || ''
+  dialogForm.factoringType = row.factoringType || ''
+  dialogForm.receivableType = row.receivableType || ''
+  dialogForm.poolMode = row.poolMode || ''
+  dialogForm.factoringMode = row.factoringMode || ''
+  dialogForm.companyName = row.companyName || ''
+  dialogForm.companyCode = row.companyCode || ''
   dialogVisible.value = true
 }
 
@@ -409,25 +609,41 @@ function handleDialogClosed() {
 async function submitDialog() {
   await dialogFormRef.value.validate()
 
+  const payload = normalizeRecord({
+    id: dialogForm.id || Date.now(),
+    dataName: dialogForm.dataName,
+    ownerType: dialogForm.ownerType,
+    taskType: dialogForm.taskType,
+    eventId: dialogForm.taskType === 'warning' ? dialogForm.eventId : '',
+    businessSegment: isProjectTaskType.value ? dialogForm.businessSegment : '',
+    projectRole: isProjectTaskType.value ? dialogForm.projectRole : '',
+    recourseFlag: isProjectTaskType.value ? dialogForm.recourseFlag : '',
+    factoringType: isProjectTaskType.value ? dialogForm.factoringType : '',
+    receivableType: isProjectTaskType.value ? dialogForm.receivableType : '',
+    poolMode: isProjectTaskType.value ? dialogForm.poolMode : '',
+    factoringMode: isProjectTaskType.value ? dialogForm.factoringMode : '',
+    companyName: isProjectTaskType.value ? '' : dialogForm.companyName,
+    companyCode: isProjectTaskType.value ? '' : dialogForm.companyCode,
+    previewCount: previewRows.value.length,
+    updateTime: nowDateTime()
+  })
+
   if (isEdit.value) {
     const index = records.value.findIndex((item) => item.id === dialogForm.id)
     if (index > -1) {
-      records.value[index] = { ...dialogForm }
+      records.value[index] = payload
     }
-    ElMessage.success('数据修改成功')
+    ElMessage.success('数据源修改成功')
   } else {
-    records.value.unshift({
-      ...dialogForm,
-      id: Date.now()
-    })
-    ElMessage.success('数据新增成功')
+    records.value.unshift(payload)
+    ElMessage.success('数据源新增成功')
   }
   saveRecords()
   dialogVisible.value = false
 }
 
 function handleDelete(row) {
-  ElMessageBox.confirm(`确认删除数据「${row.dataName}」？`, '提示', { type: 'warning' })
+  ElMessageBox.confirm(`确认删除数据源「${row.dataName}」？`, '提示', { type: 'warning' })
     .then(() => {
       records.value = records.value.filter((item) => item.id !== row.id)
       saveRecords()
@@ -442,12 +658,13 @@ function handleSearch() {
 
 function handleReset() {
   queryForm.dataName = ''
-  queryForm.periodicTaskType = ''
+  queryForm.ownerType = ''
+  queryForm.taskType = ''
 }
 </script>
 
 <style lang="scss" scoped>
-.data-page {
+.data-source-page {
   display: flex;
   flex-direction: column;
   gap: 16px;
