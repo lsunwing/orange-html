@@ -83,6 +83,12 @@ const routes = [
         name: 'SystemPermission',
         component: () => import('@/views/system/permission/index.vue'),
         meta: { title: '权限管理' }
+      },
+      {
+        path: 'system/dict',
+        name: 'SystemDict',
+        component: () => import('@/views/system/dict/index.vue'),
+        meta: { title: '字典管理' }
       }
     ]
   }

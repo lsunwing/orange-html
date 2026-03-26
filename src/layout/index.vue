@@ -64,6 +64,10 @@
             <el-icon><Lock /></el-icon>
             <template #title>权限管理</template>
           </el-menu-item>
+          <el-menu-item index="/system/dict">
+            <el-icon><Memo /></el-icon>
+            <template #title>字典管理</template>
+          </el-menu-item>
         </el-sub-menu>
       </el-menu>
     </el-aside>
@@ -100,7 +104,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useStore } from 'vuex'
-import { HomeFilled, Grid, Document, List, Fold, Expand, ArrowDown, Setting, EditPen, Timer, Files, User, UserFilled, OfficeBuilding, Lock } from '@element-plus/icons-vue'
+import { HomeFilled, Grid, Document, List, Fold, Expand, ArrowDown, Setting, EditPen, Timer, Files, User, UserFilled, OfficeBuilding, Lock, Memo } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -147,7 +151,6 @@ function handleCommand(command) {
     border-right: none;
   }
 
-  /* 折叠菜单时，只保留二级菜单图标 */
   :deep(.el-menu--collapse) {
     .menu-title-text {
       display: none;
